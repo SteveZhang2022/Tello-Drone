@@ -11,7 +11,7 @@ The version of Python used is 3.7.6
 
 Install normally if you use pip
 ```
-    pip install djitellopy
+    pip3 install djitellopy
     
     pip install pygame
 
