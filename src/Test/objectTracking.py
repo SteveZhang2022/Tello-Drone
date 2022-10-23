@@ -22,7 +22,7 @@ me.speed = 0
 
 
 
-print(me.get_battery())
+print("Battery:" + me.get_battery())
 
 me.streamoff()
 me.streamon()
@@ -30,10 +30,10 @@ me.streamon()
 
 frameWidth = width
 frameHeight = height
-# cap = cv2.VideoCapture(1)
-# cap.set(3, frameWidth)
-# cap.set(4, frameHeight)
-# cap.set(10,200)
+cap = cv2.VideoCapture(1)
+cap.set(3, frameWidth)
+cap.set(4, frameHeight)
+cap.set(10,200)
 
 
 global imgContour
