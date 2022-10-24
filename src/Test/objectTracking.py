@@ -22,7 +22,7 @@ me.speed = 0
 
 
 
-print("Battery:" + me.get_battery())
+#print("Battery:" + me.get_battery())
 
 me.streamoff()
 me.streamon()
