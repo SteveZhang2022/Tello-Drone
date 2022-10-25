@@ -9,13 +9,32 @@ from djitellopy import tello
 from getBattery import baReminder
 import cv2 as cv
 from cv2 import aruco
+import pygame
+
+def init():
+    pygame.init()
+    win = pygame.display.set_mode((400,400))
+
+def getKey(keyName):
+    ans = False
+    for eve in pygame.event.get(): pass
+    keyInput = pygame.key.get_pressed()
+    myKey = getattr(pygame, 'K_{}'.format(keyName))
+    if keyInput[myKey]:
+        ans = True
+    pygame.display.update()
+    return ans
 
 def main():
+    init()
     drone = tello.Tello()
     drone.connect()
+    print(drone.get_battery())
 
     drone.takeoff()
-    drone.move_up(60)
+    if getKey("UP"):
+        print("UP key pressed")
+        drone.move_up(60)
 #    sleep(60)
 
     drone.streamoff()
@@ -24,14 +43,14 @@ def main():
 
     param_markers = aruco.DetectorParameters_create()
 
-    cam = cv.VideoCapture(1)
+ #   cam = cv.VideoCapture(1)
 
 
 
     while True:
-        frame_read = drone.get_frame_read()
-        frame = frame_read.frame
-        frame = cv.resize(frame, (500, 350))
+        frame = drone.get_frame_read().frame
+
+        frame = cv.resize(frame, (360, 240))
         cv.imshow("frame", frame)
 
         grey_frame = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)
@@ -42,8 +61,9 @@ def main():
             print(ids, " ", corners)
 
 
-        key = cv.waitKey(1)
-        if key == ord('q'):
+        cv.waitKey(1)
+        if getKey("s"):
+            print("s key pressed")
             break
 #    cam.release()
     cv.destroyAllWindows()
