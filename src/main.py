@@ -63,17 +63,22 @@ while True:
     marker_corners, marker_IDs, reject = aruco.detectMarkers(
         gray_frame, marker_dict, parameters=param_markers
     )
-
+    aruco.drawDetectedMarkers(frame, marker_corners, marker_IDs)
     if marker_corners:
-        for ids, corners in zip(marker_IDs, marker_corners):
-           cv.polylines(
-               frame, [corners.astype(np.int32)], True, (0, 255, 255), 4, cv.LINE_AA
-           )
-           #print(ids, " ", corners)
+#        for ids, corners in zip(marker_IDs, marker_corners):
+#            cv.polylines(
+#               frame, [corners.astype(np.int32)], True, (0, 255, 255), 4, cv.LINE_AA
+#            )
+        if len(marker_IDs) == 18:
+            list18 = zip(marker_IDs, marker_corners)
+            for ids1, corners1 in list18:
+                print(ids1, " ", corners1.astype(np.int32))
+ #           break
+    print("***************one list printed****************")
     cv.imshow("frame", frame)
     cv.waitKey(1)
 
-#cap.release()
+#drone.land()
 cv.destroyAllWindows()
 
 
