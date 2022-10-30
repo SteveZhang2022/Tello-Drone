@@ -14,6 +14,18 @@ from cv2 import aruco
 import numpy as np
 import math
 
+# wid1 = input("Enter wanted id1:")
+# wid2 = input("Enter wanted id2:")
+# wid3 = input("Enter wanted id3:")
+
+wid1 = 0
+wid2 = 15
+wid3 = 26
+
+
+cidlist = []
+cidxlist = []
+count = 0
 
 kpm.init()
 drone = tello.Tello()
@@ -59,7 +71,6 @@ def getKeyBoardInput():
     if kpm.getKey("t"): drone.takeoff()
     return [lr, fb, ud, yv]
 
-
 while True:
     vals = getKeyBoardInput()
     drone.send_rc_control(vals[0], vals[1], vals[2], vals[3])
@@ -80,8 +91,8 @@ while True:
         rvec, tvec, _ = aruco.estimatePoseSingleMarkers(marker_corners, marker_length, camera_matrix,
                                                         distortion_coefficients)
 
-        print("tvec", tvec)
-        print("rvec", rvec)
+        #print("tvec", tvec)
+        #print("rvec", rvec)
 
         # In case there are multiple markers
         for i in range(marker_IDs.size):
@@ -140,12 +151,22 @@ while True:
 #            cv.polylines(
 #               frame, [corners.astype(np.int32)], True, (0, 255, 255), 4, cv.LINE_AA
 #            )
-#        if len(marker_IDs) == 18:
-#            list18 = zip(marker_IDs, marker_corners)
-#            for ids1, corners1 in list18:
-#                print(ids1, " ", corners1.astype(np.int32))
- #           break
+        if len(marker_IDs) == 18 and count == 0:
+            count = 1
+            list18 = zip(marker_IDs, marker_corners)
+            for ids1, marker_corners1 in list18:
+                # print(ids1, " ", corners1.astype(np.int32))
+                if ids1[0] == wid1 or ids1[0] == wid2 or ids1[0] == wid3:
+                    cidlist.append(ids1[0])
+                    cidxlist.append(marker_corners1[0][0][0])
+                    cidxlist.sort()
+
+#           break
+
     print("***************one list printed****************")
+
+print(cidlist)
+print(cidxlist)
     cv.imshow("frame", frame)
     cv.waitKey(1)
 
