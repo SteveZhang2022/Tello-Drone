@@ -160,15 +160,12 @@ while True:
                     cidlist.append(ids1[0])
                     cidxlist.append(marker_corners1[0][0][0])
                     cidxlist.sort()
-
-#           break
-
+    cv.imshow("frame", frame)
+    cv.waitKey(1)
     print("***************one list printed****************")
 
 print(cidlist)
 print(cidxlist)
-    cv.imshow("frame", frame)
-    cv.waitKey(1)
 
 #drone.land()
 cv.destroyAllWindows()
