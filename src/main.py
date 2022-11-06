@@ -47,6 +47,31 @@ distortion_coefficients = np.array([[0.20388981, -0.66295284, -0.0584427, 0.0077
 
 axis = np.array([[marker_length, 0, 0], [0, marker_length, 0], [0, 0, marker_length * -1]]).reshape(-1, 3)
 
+#-- Check if a matrix is a valid rotation matrix.
+def isRotationMatrix(R) :
+    Rt = np.transpose(R)
+    shouldBeIdentity = np.dot(Rt, R)
+    I = np.identity(3, dtype = R.dtype)
+    n = np.linalg.norm(I - shouldBeIdentity)
+    return n < 1e-6
+
+#--Calculate the roation matrix to euler angles
+#--The result is the same as MATLAB except the order
+#--of the euler angles ( x and z are swapped ).
+def rotationMatrixToEulerAngles(R) :
+    assert(isRotationMatrix(R))
+
+    sy = math.sqrt(R[0,0] * R[0,0] +  R[1,0] * R[1,0])
+    singular = sy < 1e-6
+    if not singular:
+        x = math.atan2(R[2,1] , R[2,2])
+        y = math.atan2(-R[2,0], sy)
+        z = math.atan2(R[1,0], R[0,0])
+    else:
+        x = math.atan2(-R[1,2], R[1,1])
+        y = math.atan2(-R[2,0], sy)
+        z = 0
+    return np.array([x, y, z])
 
 def getKeyBoardInput():
     # lr is left & right
@@ -73,6 +98,11 @@ def getKeyBoardInput():
     if kpm.getKey("t"): drone.takeoff()
     return [lr, fb, ud, yv]
 
+#-- 180 deg rotation matrix around the x axis
+R_flip = np.zeros((3,3), dtype=np.float32)
+R_flip[0,0] = 1.0
+R_flip[1,1] = -1.0
+R_flip[2,2] = -1.0
 
 def trackARuCO(x, y, z):
 
@@ -85,24 +115,24 @@ def trackARuCO(x, y, z):
 #        fb = 20
 
 
-    if z < 600 and z > 0:
-        fb = -10
-    elif z > 600:
-        fb = 10
+    if z < 400 and z > 0:
+        fb = -20
+    elif z > 400:
+        fb = 20
     else:
         fb = 0
 
-    if x > 450:
-        lr = 10
-    elif x < -450:
-        lr = -10
+    if x > 400:
+        lr = -20
+    elif x < -400:
+        lr = 20
     else:
         lr = 0
 
-    if y > 200:
-        ud = 10
-    elif y < -200:
-        ud = -10
+    if y > 400:
+        ud = 20
+    elif y < -400:
+        ud = -20
     else:
         ud = 0
 
@@ -110,8 +140,8 @@ def trackARuCO(x, y, z):
     drone.send_rc_control(lr, fb, ud, 0)
     print("send_rc_control ", lr," ",fb," ",ud, " 0")
     sleep(1.5)
-    drone.send_rc_control(0,0,0,0)
-    sleep(0.5)
+#    drone.send_rc_control(0,0,0,0)
+#    sleep(0.5)
 
 def convert3to2(inputList):
     outputList = list(itertools.chain.from_iterable(inputList))
@@ -124,6 +154,7 @@ def Sort(inputList):
 
 drone.takeoff()
 drone.move_up(40)
+drone.move_forward(40)
 
 while True:
     tvec_x = 0
@@ -157,27 +188,48 @@ while True:
                 cidxlist.append(marker_corners1[0])
         print("cidlist:", cidlist)
         print("cidxlist: ", cidxlist)
-                # tvec is the center of the marker in the camera's world
-        rvec, tvec, _ = aruco.estimatePoseSingleMarkers(cidxlist, marker_length, camera_matrix,
+        # tvec is the center of the marker in the camera's world
+        rvec, tvec,  _ = aruco.estimatePoseSingleMarkers(cidxlist, marker_length, camera_matrix,
                                                         distortion_coefficients)
 
         print("tvec ", tvec)
-    #   print("rvec ", rvec)
+        print("rvec ", rvec)
 
-            # In case there are multiple markers
-        for i in range(len(cidlist)):
-            img_aruco = cv.drawFrameAxes(img_aruco, camera_matrix, distortion_coefficients, rvec[i], tvec[i],
-                                         marker_length, 3)
+        rvecCurrent = rvec[0][0]
+        tvecCurrent = tvec[0][0]
 
-        if tvec is not None:
-            tvec_2 = convert3to2(tvec)
-            print("tvec_2: ", tvec_2)
-            tvec_sorted = Sort(tvec_2)
-            print("sorted tvec_2 ", tvec_sorted)
-            tvec_x = tvec_sorted[0][0]
-            tvec_y = tvec_sorted[0][1]
-            tvec_z = tvec_sorted[0][2]
-        trackARuCO(tvec_x, tvec_y, tvec_z)
+        # In case there are multiple markers
+#        for i in range(len(cidlist)):
+        img_aruco = cv.drawFrameAxes(img_aruco, camera_matrix, distortion_coefficients, rvecCurrent, tvecCurrent,
+                                     marker_length, 3)
+
+
+        #-- Obtain the rotation matrix tag->camera
+        R_ct = np.matrix(cv.Rodrigues(rvecCurrent)[0])
+        R_tc = R_ct.T
+
+        #-- Get the attitude in terms of euler 321 (Needs to be flipped first)
+        roll_marker, pitch_marker, yaw_marker = rotationMatrixToEulerAngles(R_flip*R_tc)
+
+        #-- Print the marker's attitude respect to camera frame
+        print("Roll: %4.0f, Pitch %4.0f, Yaw %4.0f" % (roll_marker, pitch_marker, yaw_marker))
+
+        #-- Now get Position and attitude f the camera respect to the marker
+        pos_camera = -R_tc*np.matrix(tvecCurrent).T
+        roll_camera, pitch_camera, yaw_camera = rotationMatrixToEulerAngles(R_flip*R_ct)
+
+        #-- Print the camera's attitude respect to the marker frame
+        print("Camera Position in frame marker: %4.0f, %4.0f, %4.0f" % (pos_camera[0], pos_camera[1], pos_camera[2]))
+
+ #       if tvec is not None:
+ #           tvec_2 = convert3to2(tvec)
+ #           print("tvec_2: ", tvec_2)
+ #           tvec_sorted = Sort(tvec_2)
+ #           print("sorted tvec_2 ", tvec_sorted)
+ #           tvec_x = tvec_sorted[0][0]
+ #           tvec_y = tvec_sorted[0][1]
+ #           tvec_z = tvec_sorted[0][2]
+        trackARuCO(pos_camera[0], pos_camera[1], pos_camera[2])
 
 
     cv.imshow("frame", frame)
