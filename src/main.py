@@ -12,6 +12,7 @@ from getBattery import baReminder
 import cv2 as cv
 from cv2 import aruco
 import numpy as np
+import itertools
 import math
 
 # wid1 = input("Enter wanted id1:")
@@ -33,6 +34,7 @@ drone.connect()
 baReminder()
 drone.streamoff()
 drone.streamon()
+#cap = cv.VideoCapture(1)
 marker_length = 10  # 10 cm
 marker_dict = aruco.Dictionary_get(aruco.DICT_4X4_50)
 param_markers = aruco.DetectorParameters_create()
@@ -45,7 +47,7 @@ distortion_coefficients = np.array([[0.20388981, -0.66295284, -0.0584427, 0.0077
 
 axis = np.array([[marker_length, 0, 0], [0, marker_length, 0], [0, 0, marker_length * -1]]).reshape(-1, 3)
 
-marker_range = [6200, 6800]
+
 def getKeyBoardInput():
     # lr is left & right
     # fb is front & back
@@ -72,12 +74,9 @@ def getKeyBoardInput():
     return [lr, fb, ud, yv]
 
 
-def trackARuCO(tvec1, area):
-    fb =0
-    x = tvec1[0][0][0]
-    y = tvec1[0][0][1]
-    z = tvec1[0][0][2]
+def trackARuCO(x, y, z):
 
+    print("x, y, z: ", x, y, z)
 #    if area > marker_range[0] and area < marker_range[1]:
 #        fb = 0
 #    elif area > marker_range[1]:
@@ -86,35 +85,60 @@ def trackARuCO(tvec1, area):
 #        fb = 20
 
 
-    if z < 200:
-        fb = -20
-    elif z > 200:
-        fb = 20
+    if z < 600 and z > 0:
+        fb = -10
+    elif z > 600:
+        fb = 10
     else:
         fb = 0
 
-    if x > 100:
-        lr = 20
-    elif x < -100:
-        lr = -20
+    if x > 450:
+        lr = 10
+    elif x < -450:
+        lr = -10
     else:
         lr = 0
 
-    if y > 100:
-        ud = 20
-    elif y < -100:
-        ud = -20
+    if y > 200:
+        ud = 10
+    elif y < -200:
+        ud = -10
     else:
         ud = 0
 
+
+    drone.send_rc_control(lr, fb, ud, 0)
+    print("send_rc_control ", lr," ",fb," ",ud, " 0")
+    sleep(1.5)
+    drone.send_rc_control(0,0,0,0)
+    sleep(0.5)
+
+def convert3to2(inputList):
+    outputList = list(itertools.chain.from_iterable(inputList))
+#    outputList = [sub[0] for sub in inputList]
+    return outputList
+
+def Sort(inputList):
+    inputList.sort(key = lambda x: x[0])
+    return inputList
+
 drone.takeoff()
-drone.move_up(50)
+drone.move_up(40)
 
 while True:
+    tvec_x = 0
+    tvec_y = 0
+    tvec_z = 0
+    cidlist = []
+    cidxlist = []
+    tvec_2 = []
+    tvec = []
+    rvec = []
+    tvec_sorted = []
+
     vals = getKeyBoardInput()
     drone.send_rc_control(vals[0], vals[1], vals[2], vals[3])
 
-#    frame = cap.read()
     frame = drone.get_frame_read().frame
     frame = cv.resize(frame, (360, 240))
 
@@ -125,48 +149,35 @@ while True:
     if marker_IDs is not None:
         img_aruco = aruco.drawDetectedMarkers(frame, marker_corners, marker_IDs, (0, 255, 0))
 
-        if len(marker_IDs) == 9:
-            for ids1, marker_corners1 in zip(marker_IDs, marker_corners):
-                print(ids1, " ", marker_corners1.astype(np.int32))
-                if ids1[0] == wid1 or ids1[0] == wid2 or ids1[0] == wid3:
-                    cidlist.append(ids1[0])
-                    cidxlist.append(marker_corners1[0])
-            print("cidlist:", cidlist)
-            print("cidxlist: ", cidxlist)
-        # tvec is the center of the marker in the camera's world
-            rvec, tvec, _ = aruco.estimatePoseSingleMarkers(cidxlist, marker_length, camera_matrix,
+
+        for ids1, marker_corners1 in zip(marker_IDs, marker_corners):
+            print(ids1, " ", marker_corners1.astype(np.int32))
+            if ids1[0] in targetList:
+                cidlist.append(ids1[0])
+                cidxlist.append(marker_corners1[0])
+        print("cidlist:", cidlist)
+        print("cidxlist: ", cidxlist)
+                # tvec is the center of the marker in the camera's world
+        rvec, tvec, _ = aruco.estimatePoseSingleMarkers(cidxlist, marker_length, camera_matrix,
                                                         distortion_coefficients)
 
-            print("tvec", tvec)
-            print("rvec", rvec)
+        print("tvec ", tvec)
+    #   print("rvec ", rvec)
 
             # In case there are multiple markers
-            for i in range(len(cidlist)):
-                img_aruco = cv.drawFrameAxes(img_aruco, camera_matrix, distortion_coefficients, rvec[i], tvec[i],
+        for i in range(len(cidlist)):
+            img_aruco = cv.drawFrameAxes(img_aruco, camera_matrix, distortion_coefficients, rvec[i], tvec[i],
                                          marker_length, 3)
 
-            tvec_x = tvec[0][0][0]
-            tvec_y = tvec[0][0][1]
-            drone.move_forward((int(tvec[0][0][2]/10)))
-            if (int(tvec_x/16) > 20):
-                drone.move_right((int(tvec_x/16)))
-            elif (int(tvec_x/(-16) > 20)):
-                drone.move_left(int(tvec_x/(-16)))
-            if (int(tvec_y/16)) > 20:
-                drone.move_up(int(tvec_y/16))
-            elif (int(tvec_y/(-16)) > 20):
-                drone.move_down(int(tvec_y/(-16)))
-        elif len(marker_IDs) == 1:
-            print("only see one marker now")
-            for ids1, marker_corners1 in zip(marker_IDs, marker_corners):
-                print(ids1, " ", marker_corners1.astype(np.int32))
-                if ids1[0] in targetList:
-                    rvec1, tvec1, _ = aruco.estimatePoseSingleMarkers(marker_corners1, marker_length, camera_matrix,
-                                                                      distortion_coefficients)
-                    print("tvec1:", tvec1)
-                    print("ids1:", ids1)
-                    area = (marker_corners1[0][1]-marker_corners1[0][0])*(marker_corners1[0][2]-marker_corners1[0][1])
-                    trackARuCO(tvec1, area)
+        if tvec is not None:
+            tvec_2 = convert3to2(tvec)
+            print("tvec_2: ", tvec_2)
+            tvec_sorted = Sort(tvec_2)
+            print("sorted tvec_2 ", tvec_sorted)
+            tvec_x = tvec_sorted[0][0]
+            tvec_y = tvec_sorted[0][1]
+            tvec_z = tvec_sorted[0][2]
+        trackARuCO(tvec_x, tvec_y, tvec_z)
 
 
     cv.imshow("frame", frame)
