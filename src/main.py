@@ -19,14 +19,20 @@ import math
 # wid2 = input("Enter wanted id2:")
 # wid3 = input("Enter wanted id3:")
 
-wid1 = 0
+wid1 = 2
 wid2 = 15
-wid3 = 26
-targetList = [0, 15, 26]
+wid3 = 19
+targetList = [2, 15, 19]
 
 cidlist = []
 cidxlist = []
 count = 0
+tvec_x_prev = 0
+tvec_y_prev = 0
+tvec_z_prev = 0
+detected = False
+w=360
+d=240
 
 kpm.init()
 drone = tello.Tello()
@@ -104,9 +110,39 @@ R_flip[0,0] = 1.0
 R_flip[1,1] = -1.0
 R_flip[2,2] = -1.0
 
-def trackARuCO(x, y, z):
+def trackARuCOXY(centerX, centerY, lengthX, lengthY):
+    x_delta = w/2 - centerX
+    y_delta = d/2 - centerY
 
-    print("x, y, z: ", x, y, z)
+    if (x_delta > 20 or y_delta > 20):
+        drone.go_xyz_speed(int(x_delta/lengthX * 10), int(y_delta/lengthY * 10), 20, 20)
+        sleep(4)
+
+def trackARuCOZ(z):
+    if (z>600):
+        drone.move_forward(25)
+        sleep(1)
+
+def trackARuCO(x, y, z, x_prev, y_prev, z_prev):
+
+    print("x, y, z, x_prev, y_prev, z_prev ", x, y, z, x_prev, y_prev, z_prev)
+    if abs(x-x_prev) > 50 and x<(-600*z/1200):
+        drone.move_left(20)
+        sleep(1)
+    elif abs(x-x_prev) > 50 and x>(600*z/1200):
+        drone.move_right(20)
+        sleep(1)
+    if abs(y-y_prev)>50 and y<(-200*z/1200):
+        drone.move_down(20)
+        sleep(1)
+    elif abs(y-y_prev) >50 and y>(200*z/1200):
+        drone.move_up(20)
+        sleep(1)
+    if z>700:
+        drone.move_forward(25)
+        sleep(1)
+
+
 #    if area > marker_range[0] and area < marker_range[1]:
 #        fb = 0
 #    elif area > marker_range[1]:
@@ -115,33 +151,32 @@ def trackARuCO(x, y, z):
 #        fb = 20
 
 
-    if z < 400 and z > 0:
-        fb = -20
-    elif z > 400:
-        fb = 20
-    else:
-        fb = 0
+#    if z < 400 and z > 0:
+#        fb = -15
+#    elif z > 400:
+#        fb = 15
+#    else:
+#        fb = 0
 
-    if x > 400:
-        lr = -20
-    elif x < -400:
-        lr = 20
-    else:
-        lr = 0
+#    if x > 400:
+#        lr = -15
+#    elif x < -400:
+#        lr = 15
+#    else:
+#        lr = 0
 
-    if y > 400:
-        ud = 20
-    elif y < -400:
-        ud = -20
-    else:
-        ud = 0
+#    if y > 400:
+#        ud = 15
+#    elif y < -400:
+#        ud = -15
+#    else:
+#        ud = 0
 
 
-    drone.send_rc_control(lr, fb, ud, 0)
-    print("send_rc_control ", lr," ",fb," ",ud, " 0")
-    sleep(1.5)
+#    drone.send_rc_control(lr, fb, ud, 0)
+#    sleep(1.5)
 #    drone.send_rc_control(0,0,0,0)
-#    sleep(0.5)
+#   sleep(0.5)
 
 def convert3to2(inputList):
     outputList = list(itertools.chain.from_iterable(inputList))
@@ -154,7 +189,7 @@ def Sort(inputList):
 
 drone.takeoff()
 drone.move_up(40)
-drone.move_forward(40)
+drone.move_forward(20)
 
 while True:
     tvec_x = 0
@@ -166,12 +201,20 @@ while True:
     tvec = []
     rvec = []
     tvec_sorted = []
+    rvecCurrent = []
+    tvecCurrent = []
+
+    x_center = 0
+    y_center = 0
+    x_length = 0
+    y_length = 0
+
 
     vals = getKeyBoardInput()
     drone.send_rc_control(vals[0], vals[1], vals[2], vals[3])
 
     frame = drone.get_frame_read().frame
-    frame = cv.resize(frame, (360, 240))
+    frame = cv.resize(frame, (w, d))
 
     gray_frame = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)
     marker_corners, marker_IDs, reject = aruco.detectMarkers(
@@ -184,6 +227,7 @@ while True:
         for ids1, marker_corners1 in zip(marker_IDs, marker_corners):
             print(ids1, " ", marker_corners1.astype(np.int32))
             if ids1[0] in targetList:
+                detected = True
                 cidlist.append(ids1[0])
                 cidxlist.append(marker_corners1[0])
         print("cidlist:", cidlist)
@@ -194,42 +238,55 @@ while True:
 
         print("tvec ", tvec)
         print("rvec ", rvec)
+        if cidxlist is not None:
+            x_center = (cidxlist[0][0][0] + cidxlist[0][1][0] + cidxlist[0][2][0] + cidxlist[0][3][0]) / 4
+            y_center = (cidxlist[0][0][1] + cidxlist[0][1][1] + cidxlist[0][2][1] + cidxlist[0][3][1]) / 4
+            print("x_center, y_center ", x_center, y_center)
+            x_length = max(cidxlist[0][0][0], cidxlist[0][1][0], cidxlist[0][2][0], cidxlist[0][3][0]) - min(cidxlist[0][0][0], cidxlist[0][1][0], cidxlist[0][2][0], cidxlist[0][3][0])
+            y_length = max(cidxlist[0][0][1], cidxlist[0][1][1], cidxlist[0][2][1], cidxlist[0][3][1]) - min(cidxlist[0][0][1], cidxlist[0][1][1], cidxlist[0][2][1], cidxlist[0][3][1])
+            print("x_length, y_length ", x_length, y_length)
+        trackARuCOXY(x_center, y_center, x_length, y_length)
+        if rvec is not None and tvec is not None:
+            rvecCurrent = rvec[0][0]
+            tvecCurrent = tvec[0][0]
 
-        rvecCurrent = rvec[0][0]
-        tvecCurrent = tvec[0][0]
-
-        # In case there are multiple markers
-#        for i in range(len(cidlist)):
-        img_aruco = cv.drawFrameAxes(img_aruco, camera_matrix, distortion_coefficients, rvecCurrent, tvecCurrent,
+            # In case there are multiple markers
+#           for i in range(len(cidlist)):
+            img_aruco = cv.drawFrameAxes(img_aruco, camera_matrix, distortion_coefficients, rvecCurrent, tvecCurrent,
                                      marker_length, 3)
 
 
-        #-- Obtain the rotation matrix tag->camera
-        R_ct = np.matrix(cv.Rodrigues(rvecCurrent)[0])
-        R_tc = R_ct.T
+            #-- Obtain the rotation matrix tag->camera
+            R_ct = np.matrix(cv.Rodrigues(rvecCurrent)[0])
+            R_tc = R_ct.T
 
-        #-- Get the attitude in terms of euler 321 (Needs to be flipped first)
-        roll_marker, pitch_marker, yaw_marker = rotationMatrixToEulerAngles(R_flip*R_tc)
+            #-- Get the attitude in terms of euler 321 (Needs to be flipped first)
+            roll_marker, pitch_marker, yaw_marker = rotationMatrixToEulerAngles(R_flip*R_tc)
 
-        #-- Print the marker's attitude respect to camera frame
-        print("Roll: %4.0f, Pitch %4.0f, Yaw %4.0f" % (roll_marker, pitch_marker, yaw_marker))
+            #-- Print the marker's attitude respect to camera frame
+            print("Roll: %4.0f, Pitch %4.0f, Yaw %4.0f" % (roll_marker, pitch_marker, yaw_marker))
 
-        #-- Now get Position and attitude f the camera respect to the marker
-        pos_camera = -R_tc*np.matrix(tvecCurrent).T
-        roll_camera, pitch_camera, yaw_camera = rotationMatrixToEulerAngles(R_flip*R_ct)
+            #-- Now get Position and attitude f the camera respect to the marker
+            pos_camera = -R_tc*np.matrix(tvecCurrent).T
+            roll_camera, pitch_camera, yaw_camera = rotationMatrixToEulerAngles(R_flip*R_ct)
 
-        #-- Print the camera's attitude respect to the marker frame
-        print("Camera Position in frame marker: %4.0f, %4.0f, %4.0f" % (pos_camera[0], pos_camera[1], pos_camera[2]))
+            #-- Print the camera's attitude respect to the marker frame
+            print("Camera Position in frame marker: %4.0f, %4.0f, %4.0f" % (pos_camera[0], pos_camera[1], pos_camera[2]))
 
- #       if tvec is not None:
- #           tvec_2 = convert3to2(tvec)
- #           print("tvec_2: ", tvec_2)
- #           tvec_sorted = Sort(tvec_2)
- #           print("sorted tvec_2 ", tvec_sorted)
- #           tvec_x = tvec_sorted[0][0]
- #           tvec_y = tvec_sorted[0][1]
- #           tvec_z = tvec_sorted[0][2]
-        trackARuCO(pos_camera[0], pos_camera[1], pos_camera[2])
+            tvec_2 = convert3to2(tvec)
+            print("tvec_2: ", tvec_2)
+            tvec_sorted = Sort(tvec_2)
+            print("sorted tvec_2 ", tvec_sorted)
+            tvec_x = tvec_sorted[0][0]
+            tvec_y = tvec_sorted[0][1]
+            tvec_z = tvec_sorted[0][2]
+            trackARuCOZ(tvec_z)
+            tvec_x_prev = tvec_x
+            tvec_y_prev = tvec_y
+            tvec_z_prev = tvec_z
+ #       elif detected == True:
+            #-- lost target search again
+#            drone.move_back(40)
 
 
     cv.imshow("frame", frame)
