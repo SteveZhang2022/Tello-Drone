@@ -20,9 +20,9 @@ import math
 # wid3 = input("Enter wanted id3:")
 
 wid1 = 2
-wid2 = 15
+wid2 = 27
 wid3 = 19
-targetList = [2, 15, 19]
+targetList = [2, 27, 19]
 
 cidlist = []
 cidxlist = []
@@ -111,12 +111,24 @@ R_flip[1,1] = -1.0
 R_flip[2,2] = -1.0
 
 def trackARuCOXY(centerX, centerY, lengthX, lengthY):
-    x_delta = w/2 - centerX
-    y_delta = d/2 - centerY
+    x_delta = centerX - w/2
+    y_delta = centerY - d/3
 
-    if (x_delta > 20 or y_delta > 20):
-        drone.go_xyz_speed(int(x_delta/lengthX * 10), int(y_delta/lengthY * 10), 20, 20)
-        sleep(4)
+    print("lengthX, lengthY, area pixel", lengthX, lengthY, lengthX * lengthY)
+    if (lengthX * lengthY < int((w*d)/32)):
+        if (abs(x_delta) > lengthX/2 and abs(y_delta) > lengthY/2):
+            drone.go_xyz_speed(40, int(x_delta/lengthX * (-10)), int(y_delta/lengthY * (-10)), 20)
+        elif (abs(y_delta) <= lengthY/2):
+            drone.go_xyz_speed(40, int(x_delta/lengthX * (-10)), 0, 20)
+        elif (abs(x_delta) <= lengthX/2):
+            drone.go_xyz_speed(40, 0, int(y_delta/lengthY * (-10)), 20)
+    else:
+        drone.move_forward(30)
+        sleep(1)
+        drone.move_back(30)
+#        print("lengthX, lengthY, area pixel", lengthX, lengthY, lengthX*lengthY)
+
+    sleep(1)
 
 def trackARuCOZ(z):
     if (z>600):
@@ -238,14 +250,14 @@ while True:
 
         print("tvec ", tvec)
         print("rvec ", rvec)
-        if cidxlist is not None:
+        if len(cidxlist) != 0:
             x_center = (cidxlist[0][0][0] + cidxlist[0][1][0] + cidxlist[0][2][0] + cidxlist[0][3][0]) / 4
             y_center = (cidxlist[0][0][1] + cidxlist[0][1][1] + cidxlist[0][2][1] + cidxlist[0][3][1]) / 4
             print("x_center, y_center ", x_center, y_center)
             x_length = max(cidxlist[0][0][0], cidxlist[0][1][0], cidxlist[0][2][0], cidxlist[0][3][0]) - min(cidxlist[0][0][0], cidxlist[0][1][0], cidxlist[0][2][0], cidxlist[0][3][0])
             y_length = max(cidxlist[0][0][1], cidxlist[0][1][1], cidxlist[0][2][1], cidxlist[0][3][1]) - min(cidxlist[0][0][1], cidxlist[0][1][1], cidxlist[0][2][1], cidxlist[0][3][1])
             print("x_length, y_length ", x_length, y_length)
-        trackARuCOXY(x_center, y_center, x_length, y_length)
+            trackARuCOXY(x_center, y_center, x_length, y_length)
         if rvec is not None and tvec is not None:
             rvecCurrent = rvec[0][0]
             tvecCurrent = tvec[0][0]
@@ -280,7 +292,7 @@ while True:
             tvec_x = tvec_sorted[0][0]
             tvec_y = tvec_sorted[0][1]
             tvec_z = tvec_sorted[0][2]
-            trackARuCOZ(tvec_z)
+#            trackARuCOZ(tvec_z)
             tvec_x_prev = tvec_x
             tvec_y_prev = tvec_y
             tvec_z_prev = tvec_z
