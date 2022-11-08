@@ -15,14 +15,14 @@ import numpy as np
 import itertools
 import math
 
-# wid1 = input("Enter wanted id1:")
+# wid1 = input("Enter wanted id1:")q
 # wid2 = input("Enter wanted id2:")
 # wid3 = input("Enter wanted id3:")
 
-wid1 = 2
-wid2 = 27
-wid3 = 19
-targetList = [2, 27, 19]
+wid1 = 18
+wid2 = 0
+wid3 = 9
+targetList = [18, 0, 9]
 
 cidlist = []
 cidxlist = []
@@ -31,8 +31,11 @@ tvec_x_prev = 0
 tvec_y_prev = 0
 tvec_z_prev = 0
 detected = False
+count = 0
 w=360
 d=240
+
+check_timer = 60
 
 kpm.init()
 drone = tello.Tello()
@@ -115,17 +118,17 @@ def trackARuCOXY(centerX, centerY, lengthX, lengthY):
     y_delta = centerY - d/3
 
     print("lengthX, lengthY, area pixel", lengthX, lengthY, lengthX * lengthY)
-    if (lengthX * lengthY < int((w*d)/32)):
+    if (lengthX * lengthY < int((w*d)/28)):
         if (abs(x_delta) > lengthX/2 and abs(y_delta) > lengthY/2):
-            drone.go_xyz_speed(40, int(x_delta/lengthX * (-10)), int(y_delta/lengthY * (-10)), 20)
+            drone.go_xyz_speed(40, int(x_delta/lengthX * (-10)), int(y_delta/lengthY * (-10)), 30)
         elif (abs(y_delta) <= lengthY/2):
-            drone.go_xyz_speed(40, int(x_delta/lengthX * (-10)), 0, 20)
+            drone.go_xyz_speed(40, int(x_delta/lengthX * (-10)), 0, 30)
         elif (abs(x_delta) <= lengthX/2):
-            drone.go_xyz_speed(40, 0, int(y_delta/lengthY * (-10)), 20)
+            drone.go_xyz_speed(40, 0, int(y_delta/lengthY * (-10)), 30)
     else:
-        drone.move_forward(30)
+        drone.move_forward(40)
         sleep(1)
-        drone.move_back(30)
+        drone.move_back(80)
 #        print("lengthX, lengthY, area pixel", lengthX, lengthY, lengthX*lengthY)
 
     sleep(1)
@@ -148,7 +151,7 @@ def trackARuCO(x, y, z, x_prev, y_prev, z_prev):
         drone.move_down(20)
         sleep(1)
     elif abs(y-y_prev) >50 and y>(200*z/1200):
-        drone.move_up(20)
+        drone.move_up(30)
         sleep(1)
     if z>700:
         drone.move_forward(25)
@@ -201,7 +204,7 @@ def Sort(inputList):
 
 drone.takeoff()
 drone.move_up(40)
-drone.move_forward(20)
+drone.move_forward(30)
 
 while True:
     tvec_x = 0
@@ -222,6 +225,8 @@ while True:
     y_length = 0
 
 
+
+    check_timer -= 1
     vals = getKeyBoardInput()
     drone.send_rc_control(vals[0], vals[1], vals[2], vals[3])
 
@@ -241,6 +246,7 @@ while True:
             if ids1[0] in targetList:
                 detected = True
                 cidlist.append(ids1[0])
+                count = len(cidlist)
                 cidxlist.append(marker_corners1[0])
         print("cidlist:", cidlist)
         print("cidxlist: ", cidxlist)
@@ -258,6 +264,16 @@ while True:
             y_length = max(cidxlist[0][0][1], cidxlist[0][1][1], cidxlist[0][2][1], cidxlist[0][3][1]) - min(cidxlist[0][0][1], cidxlist[0][1][1], cidxlist[0][2][1], cidxlist[0][3][1])
             print("x_length, y_length ", x_length, y_length)
             trackARuCOXY(x_center, y_center, x_length, y_length)
+        else:
+            if check_timer == 0 and count < 5:
+                drone.move_back(20)
+                check_timer = 60
+                count += 1
+            else:
+                check_timer = 60
+                count = 0
+                drone.move_forward(80)
+                sleep(1)
         if rvec is not None and tvec is not None:
             rvecCurrent = rvec[0][0]
             tvecCurrent = tvec[0][0]
@@ -299,8 +315,17 @@ while True:
  #       elif detected == True:
             #-- lost target search again
 #            drone.move_back(40)
-
-
+    else:
+        if check_timer == 0 and count < 5:
+            drone.move_back(20)
+            check_timer = 60
+            count += 1
+        else:
+            check_timer = 60
+            count = 0
+            drone.move_forward(80)
+            sleep(1)
+    print("check_timer, count:", check_timer, count)
     cv.imshow("frame", frame)
     cv.waitKey(1)
 
